@@ -1,6 +1,10 @@
 package android.example.whowroteit;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.loader.app.LoaderManager;
+import androidx.loader.content.Loader;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
@@ -18,7 +22,7 @@ import org.json.JSONObject;
 
 import java.lang.ref.WeakReference;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<String> {
 
     private EditText mBookInput;
     private TextView mTitleText;
@@ -33,6 +37,77 @@ public class MainActivity extends AppCompatActivity {
         mTitleText = findViewById(R.id.titleText);
         mAuthorText = findViewById(R.id.authorText);
 
+        if(getSupportLoaderManager().getLoader(0)!=null){
+            getSupportLoaderManager().initLoader(0,null,this);
+        }
+
+    }
+
+    @NonNull
+    @Override
+    public Loader<String> onCreateLoader(int id, @Nullable Bundle args) {
+        String queryString = "";
+
+        if (args != null) {
+            queryString = args.getString("queryString");
+        }
+
+        return new BookLoader(this, queryString);
+    }
+
+    @Override
+    public void onLoadFinished(@NonNull Loader<String> loader, String data) {
+        try {
+            JSONObject jsonObject = new JSONObject(data);
+            JSONArray itemsArray = jsonObject.getJSONArray("items");
+
+            int i = 0;
+            String title = null;
+            String authors = null;
+
+            while (i < itemsArray.length() &&
+                    (authors == null && title == null)) {
+                // Get the current item information.
+                JSONObject book = itemsArray.getJSONObject(i);
+                JSONObject volumeInfo = book.getJSONObject("volumeInfo");
+
+                // Try to get the author and title from the current item,
+                // catch if either field is empty and move on.
+                try {
+                    title = volumeInfo.getString("title");
+                    authors = volumeInfo.getString("authors");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                // Move to the next item.
+                i++;
+            }
+
+            // If both are found, display the result.
+            if (title != null && authors != null) {
+                mTitleText.setText(title);
+                mAuthorText.setText(authors);
+                //mBookInput.setText("");
+            } else {
+                // If none are found, update the UI to show failed results.
+                mTitleText.setText(R.string.no_results);
+                mAuthorText.setText("");
+            }
+
+
+        } catch (JSONException e) {
+            // If onPostExecute does not receive a proper JSON string,
+            // update the UI to show failed results.
+            mTitleText.setText(R.string.no_results);
+            mAuthorText.setText("");
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onLoaderReset(@NonNull Loader<String> loader) {
+
     }
 
     public void searchBooks(View view) {
@@ -42,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
         InputMethodManager inputManager = (InputMethodManager)
                 getSystemService(Context.INPUT_METHOD_SERVICE);
 
-        if (inputManager != null ) {
+        if (inputManager != null) {
             inputManager.hideSoftInputFromWindow(view.getWindowToken(),
                     InputMethodManager.HIDE_NOT_ALWAYS);
         }
@@ -54,7 +129,11 @@ public class MainActivity extends AppCompatActivity {
         }
         if (networkInfo != null && networkInfo.isConnected()
                 && queryString.length() != 0) {
-            new FetchBook(mTitleText, mAuthorText).execute(queryString);
+
+            Bundle queryBundle = new Bundle();
+            queryBundle.putString("queryString", queryString);
+            getSupportLoaderManager().restartLoader(0, queryBundle, this);
+
             mAuthorText.setText("");
             mTitleText.setText(R.string.loading);
         } else {
@@ -68,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public class FetchBook extends AsyncTask<String, Void, String> {
+    /*public class FetchBook extends AsyncTask<String, Void, String> {
 
         private WeakReference<TextView> mTitleText;
         private WeakReference<TextView> mAuthorText;
@@ -123,7 +202,6 @@ public class MainActivity extends AppCompatActivity {
                 }
 
 
-
             } catch (JSONException e) {
                 // If onPostExecute does not receive a proper JSON string,
                 // update the UI to show failed results.
@@ -134,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-    }
+    }*/
 
 
 }
